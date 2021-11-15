@@ -3,6 +3,7 @@ Option Explicit
 'xrename replace -dir "c:\movie a\" -string /wma$/ig -newstring "rmvb" -type file:/.*\.wma/ -ignorecase yes -log yes -output "c:\list.txt"
 'xrename replace -dir "C:\Documents and Settings\sysdzw\桌面\XRename\inetfilename" -string "[1]" -newstring "" -log yes
 'xrename delete -dir "C:\Documents and Settings\sysdzw\桌面\XRename\inetfilename" -string "[1]"
+'-ignoreExt 忽略处理后缀名
 '直接从命令行参数获得的数据
 Dim strCmdSub           As String   '二级命令
 Dim strDirectory        As String   '工作目录
@@ -11,6 +12,7 @@ Dim strNewString        As String   '替换后的字符
 Dim strType             As String   '要替换的对象限定范围的参数，包含对象类型(file|dir|all)和过滤名称的正则表达式
 Dim isDealSubDir        As Boolean  '是否递归子目录 默认值：false
 Dim isIgnoreCase        As Boolean  '是否忽略字母大小写 默认值：true
+Dim isIgnoreExt        As Boolean  '是否忽略处理后缀名 默认值：true
 Dim isPutLog            As Boolean  '是否输出处理的log  默认值：false
 Dim strOutputFile       As String   '输出文件列表的路径(仅用于XRename listfile命令)
 
@@ -45,7 +47,7 @@ Sub Main()
     If strCmd = "" Then
         MsgBox "参数不能为空！" & vbCrLf & vbCrLf & _
                 "语法如下:" & vbCrLf & _
-                "(1) replace -dir directory -string string1 -new string2 [-type (file|dir|all)[:string3]] [-ignorecase {yes|no}] [-log {yes|no}]" & vbCrLf & _
+                "(1) replace -dir directory -string string1 -new string2 [-type (file|dir|all)[:string3]] [-ignorecase {yes|no}] [-ignoreExt {yes|no}] [-log {yes|no}]" & vbCrLf & _
                 "(2) delete -dir directory -string string1 [-type (file|dir|all)[:string3]] [-ignorecase {yes|no}] [-log {yes|no}]" & vbCrLf & _
                 "(3) listfile -dir directory -string string1 [-type (file|dir|all)[:string3]] [-ignorecase {yes|no}] [-output path]" & vbCrLf & _
                 "(4) delfile -dir directory -string string1 [-type (file|dir|all)[:string3]] [-ignorecase {yes|no}] [-log {yes|no}]" & vbCrLf & _
@@ -68,6 +70,7 @@ Private Sub SetParameter()
     
     strType = regGetStrSub2(strCmdTmp, "-type\s*?(""?)(.+?)\1\s+?")
     isIgnoreCase = IIf(LCase(regGetStrSub2(strCmdTmp, "-ignorecase\s+?(""?)(.+?)\1\s+?")) = "yes", True, False)
+    isIgnoreExt = IIf(LCase(regGetStrSub2(strCmdTmp, "-ignoreext\s+?(""?)(.+?)\1\s+?")) = "yes", True, False)
     isPutLog = IIf(LCase(regGetStrSub2(strCmdTmp, "-log\s+?(""?)(.+?)\1\s+?")) = "yes", True, False)
     strOutputFile = regGetStrSub2(strCmdTmp, "-output\s+?(""?)(.+?)\1\s+?")
     
@@ -196,8 +199,12 @@ Private Sub DoCommand()
                     
                     If isDone Then
                         strFileNameEx = strDirectory & vFileName(i) '当前文件的全路径
-                
-                        strFileNameNew = regForReplace.Replace(vFileName(i), strNewString) '短文件名进行替换
+                        
+                        If isIgnoreExt And InStr(vFileName(i), ".") > 0 Then '忽略后缀名。也就是不处理后缀名
+                            strFileNameNew = regForReplace.Replace(Left(vFileName(i), InStrRev(vFileName(i), ".") - 1), strNewString) '短文件名进行替换
+                        Else
+                            strFileNameNew = regForReplace.Replace(vFileName(i), strNewString) '短文件名进行替换
+                        End If
                         strFileNameNewEx = strDirectory & strFileNameNew '即将替换成的文件的全路径
                         
                         If strFileNameEx <> strFileNameNewEx Then
