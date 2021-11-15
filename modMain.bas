@@ -152,8 +152,8 @@ Private Sub DoCommand()
     
 
     Dim strFileNameAll$, vFileName, i&
-    Dim strFileName$, strFileNameEx$
-    Dim strFileNameNew$, strFileNameNewEx$
+    Dim strFileName$, strFileNameFull$, strFileNamePre$, strFileNameExt$, v
+    Dim strFileNameNew$, strFileNameNewFull$
     Dim strRenameStatus$
     Dim strDeleteFileStatus$
     Dim isDone As Boolean
@@ -198,17 +198,20 @@ Private Sub DoCommand()
                     End If
                     
                     If isDone Then
-                        strFileNameEx = strDirectory & vFileName(i) '当前文件的全路径
+                        strFileNameFull = strDirectory & vFileName(i) '当前文件的全路径
                         
                         If isIgnoreExt And InStr(vFileName(i), ".") > 0 Then '忽略后缀名。也就是不处理后缀名
-                            strFileNameNew = regForReplace.Replace(Left(vFileName(i), InStrRev(vFileName(i), ".") - 1), strNewString) '短文件名进行替换
+                            v = Split(vFileName(i), ".")
+                            strFileNamePre = Left(vFileName(i), InStrRev(vFileName(i), ".") - 1)
+                            strFileNameExt = v(UBound(v))
+                            strFileNameNew = regForReplace.Replace(strFileNamePre, strNewString) & "." & strFileNameExt '短文件名进行替换
                         Else
                             strFileNameNew = regForReplace.Replace(vFileName(i), strNewString) '短文件名进行替换
                         End If
-                        strFileNameNewEx = strDirectory & strFileNameNew '即将替换成的文件的全路径
+                        strFileNameNewFull = strDirectory & strFileNameNew '即将替换成的文件的全路径
                         
-                        If strFileNameEx <> strFileNameNewEx Then
-                            strRenameStatus = DoRename(strFileNameEx, strFileNameNewEx)
+                        If strFileNameFull <> strFileNameNewFull Then
+                            strRenameStatus = DoRename(strFileNameFull, strFileNameNewFull)
                             If isPutLog Then writeToFile strDirectory & "XRename.log", strRenameStatus, False
                             If InStr(strRenameStatus, "状态:失败") > 0 Then writeToFile strDirectory & "err.log", strRenameStatus, False
                         End If
@@ -223,12 +226,12 @@ Private Sub DoCommand()
                     End If
                     
                     If isDone Then
-                        strFileNameEx = strDirectory & vFileName(i) '当前文件的全路径
+                        strFileNameFull = strDirectory & vFileName(i) '当前文件的全路径
                         strFileNameNew = regForReplace.Replace(vFileName(i), "") '短文件名进行替换
-                        strFileNameNewEx = strDirectory & strFileNameNew '即将替换成的文件的全路径
+                        strFileNameNewFull = strDirectory & strFileNameNew '即将替换成的文件的全路径
                         
-                        If strFileNameEx <> strFileNameNewEx Then
-                            strRenameStatus = DoRename(strFileNameEx, strFileNameNewEx)
+                        If strFileNameFull <> strFileNameNewFull Then
+                            strRenameStatus = DoRename(strFileNameFull, strFileNameNewFull)
                             If isPutLog Then writeToFile strDirectory & "XRename.log", strRenameStatus, False
                             If InStr(strRenameStatus, "状态:重命名失败") > 0 Then writeToFile strDirectory & "err.log", strRenameStatus, False
                         End If
@@ -243,7 +246,7 @@ Private Sub DoCommand()
                     End If
                     
                     If isDone Then
-                        strFileNameEx = strDirectory & vFileName(i) '当前文件的全路径
+                        strFileNameFull = strDirectory & vFileName(i) '当前文件的全路径
                     
                         If regForReplace.test(vFileName(i)) Then
                             writeToFile strOutputFile, strDeleteFileStatus, False
@@ -259,10 +262,10 @@ Private Sub DoCommand()
                     End If
                     
                     If isDone Then
-                        strFileNameEx = strDirectory & vFileName(i) '当前文件的全路径
+                        strFileNameFull = strDirectory & vFileName(i) '当前文件的全路径
                     
                         If regForReplace.test(vFileName(i)) Then
-                            strDeleteFileStatus = DoDelete(strFileNameEx)
+                            strDeleteFileStatus = DoDelete(strFileNameFull)
                             If isPutLog Then writeToFile strDirectory & "XRename.log", strDeleteFileStatus, False
                             If InStr(strRenameStatus, "状态:删除名失败") > 0 Then writeToFile strDirectory & "err.log", strDeleteFileStatus, False
                         End If
@@ -277,10 +280,10 @@ Private Sub DoCommand()
                     End If
                     
                     If isDone Then
-                        strFileNameEx = strDirectory & vFileName(i) '当前文件的全路径
+                        strFileNameFull = strDirectory & vFileName(i) '当前文件的全路径
                     
                         If regForReplace.test(vFileName(i)) Then
-                            strDeleteFileStatus = DoDelete(strFileNameEx)
+                            strDeleteFileStatus = DoDelete(strFileNameFull)
                             If isPutLog Then writeToFile strDirectory & "XRename.log", strDeleteFileStatus, False
                             If InStr(strRenameStatus, "状态:删除名失败") > 0 Then writeToFile strDirectory & "err.log", strDeleteFileStatus, False
                         End If
@@ -295,13 +298,13 @@ Private Sub DoCommand()
                     End If
                     
                     If isDone Then
-                        strFileNameEx = strDirectory & vFileName(i) '当前文件的全路径
+                        strFileNameFull = strDirectory & vFileName(i) '当前文件的全路径
                 
                         strFileNameNew = UTF8Decode(vFileName(i)) '短文件名进行UTF8编码转换
-                        strFileNameNewEx = strDirectory & strFileNameNew '即将替换成的文件的全路径
+                        strFileNameNewFull = strDirectory & strFileNameNew '即将替换成的文件的全路径
                         
-                        If strFileNameEx <> strFileNameNewEx Then
-                            strRenameStatus = DoRename(strFileNameEx, strFileNameNewEx)
+                        If strFileNameFull <> strFileNameNewFull Then
+                            strRenameStatus = DoRename(strFileNameFull, strFileNameNewFull)
                             If isPutLog Then writeToFile strDirectory & "XRename.log", strRenameStatus, False
                             If InStr(strRenameStatus, "状态:失败") > 0 Then writeToFile strDirectory & "err.log", strRenameStatus, False
                         End If
