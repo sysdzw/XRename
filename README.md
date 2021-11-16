@@ -58,12 +58,12 @@ XRename delete -dir "c:\movie\" -string"book"
 
 (2)将"c:\inet\"下所有文件的文件名中的"["和"]"删除，这个应用很典型，例如从ie临时文件夹拷贝出来的文件基本都会带有字符[1]和[2]字样的
 
-XRename delete -dir "c:\inet\" -string "/\[|\]/ig"
+XRename delete -dir "c:\inet\" -string /\[|\]/ig
 
 
 如果要直接把[1]或[2]删除的话，可以用下面的方法，不过可能会引起冲突
 
-XRename delete -dir "c:\inet\" -string "/\[\d+\]/ig"
+XRename delete -dir "c:\inet\" -string /\[\d+\]/ig
 
 
 
@@ -95,7 +95,7 @@ delfile -dir directory -string string1 [-type (file|dir|all)[:string3]] [-subdir
 XRename delfile -dir "c:\movie\" -string "苍井空"
 
 (2)删除"c:\test\"下所有目录名为数字的目录，包含子目录。subdir 表示是否包含子目录
-XRename delfile -dir "c:\test\" -string "^\d+$"-type dir -subdir yes
+XRename delfile -dir "c:\test\" -string /^\d+$/ -type dir -subdir yes
 
 
 5.UTF8类型的解码，语法：
