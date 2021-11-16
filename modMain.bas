@@ -65,10 +65,13 @@ Private Sub SetParameter()
     strCmdSub = regGetStrSub1(strCmdTmp, "^(.+?)\s+?")
     strDirectory = regGetStrSub2(strCmdTmp, "-(?:dir|path)\s+?(""?)(.+?)\1\s+?")
     
-    strString = regGetStrSub2(strCmdTmp, "-string\s+?(""?)(.+?)\1\s+?")
+    strString = regGetStrSub1(strCmdTmp, "-string\s+?(/.*?/[^\s]*)") '先尝试//正则方式获取
+    If strString = "" Then strString = regGetStrSub2(strCmdTmp, "-string\s+?(""?)(.+?)\1\s+?")
+    
     strNewString = regGetStrSub2(strCmdTmp, "-(?:new|newstring|replacewith)\s+?(""?)(.*?)\1\s+?")
     
-    strType = regGetStrSub2(strCmdTmp, "-type\s*?(""?)(.+?)\1\s+?")
+    strType = regGetStrSub2(strCmdTmp, "-type\s+?(""?)(.+?)\1\s+?")
+    
     isIgnoreCase = IIf(LCase(regGetStrSub2(strCmdTmp, "-ignorecase\s+?(""?)(.+?)\1\s+?")) = "yes", True, False)
     isIgnoreExt = IIf(LCase(regGetStrSub2(strCmdTmp, "-ignoreext\s+?(""?)(.+?)\1\s+?")) = "yes", True, False)
     isPutLog = IIf(LCase(regGetStrSub2(strCmdTmp, "-log\s+?(""?)(.+?)\1\s+?")) = "yes", True, False)
@@ -82,17 +85,10 @@ Private Sub SetParameter()
     
     Dim v
     If strString <> "" Then '用户设置了-string参数
-        v = regGetStrSubs(strString, "/(.+?)/(.*)") '分离出正则表达式的值和类型。处理数据例如“/.*\.wma/ig”
-        If v(0) <> "*NULL*" Then '如果匹配成功那么表示是正则表达式
+        If Left(strString, 1) = "/" Then '表示正则模式
+            v = regGetStrSubs(strString, "/(.+?)/(.*)") '分离出正则表达式的值和类型。处理数据例如“/.*\.wma/ig
             strStringPattern = v(0) '要处理的对象过滤名称的正则表达式
             strStringPatternP = LCase(v(1)) '要处理的对象过滤名称的正则表达式的类型
-        Else '匹配为空说明是普通字符串，下面执行转换为正则表达式
-            reg.Pattern = "([\[\]\(\)\{\}\.\+\-\/\|\^\$\=\,\?\:])"
-            reg.Global = True
-            strStringPattern = reg.Replace(strString, "\$1")
-            strStringPatternP = "ig" 'g表示global表示全部匹配处理，默认需要加上g。需要普及的知识是正则对象默认的global、ignorecase、multiline属性都是false
-            If isIgnoreCase Then strStringPatternP = "i" & strStringPatternP '表示如果此时指定了需要忽略大小写，那么需要在正则的属性里加上i，表示ignorecase
-            strNewString = Replace(strNewString, "$", "\$") '如果是普通字符串的话，那么表示这里有$，应该转义
         End If
     End If
     
@@ -107,7 +103,7 @@ Private Sub SetParameter()
                 If v(0) <> "*NULL*" Then
                     strTypePattern = v(0) '要处理的对象过滤名称的正则表达式
                     strTypePatternP = LCase(v(1)) '要处理的对象过滤名称的正则表达式的类型
-                Else '匹配为空说明是普通字符串，下面执行转换为正则表达式，需要遵循两个规则：1.遇到?替换成. 2.遇到*替换成.*?
+                Else '匹配为空说明是普通字符串，下面执行转换为正则表达式，需要遵循两个规则：1.遇到?替换成. 2.遇到*替换成.*?  但是如果有*或者问号需要用正则处理。 *.txt -> .*\.txt 再例如： a?b 变成a.b
                     reg.Pattern = "(\[\]\(\)\{\}\.\+\-\/\|\^\$\=\,)"
                     reg.Global = True
                     strTypePattern = reg.Replace(strTypeEx, "\$1")
@@ -115,7 +111,7 @@ Private Sub SetParameter()
                     If Left(strTypePattern, 1) <> "*" And InStr(strTypePattern, "*") > 0 Then strTypePattern = "^" & strTypePattern
                     If Right(strTypePattern, 1) <> "*" And InStr(strTypePattern, "*") Then strTypePattern = strTypePattern & "$"
                     strTypePattern = Replace(strTypePattern, "*", ".*?")
-                    
+
                     strTypePatternP = "ig"
                 End If
             End If
@@ -199,15 +195,25 @@ Private Sub DoCommand()
                     
                     If isDone Then
                         strFileNameFull = strDirectory & vFileName(i) '当前文件的全路径
-                        
-                        If isIgnoreExt And InStr(vFileName(i), ".") > 0 Then '忽略后缀名。也就是不处理后缀名
+
+                        If isIgnoreExt And InStr(vFileName(i), ".") > 0 Then   '忽略后缀名。也就是不处理后缀名，当然如果没有后缀名的话直接走下面的分支替换
                             v = Split(vFileName(i), ".")
-                            strFileNamePre = Left(vFileName(i), InStrRev(vFileName(i), ".") - 1)
-                            strFileNameExt = v(UBound(v))
-                            strFileNameNew = regForReplace.Replace(strFileNamePre, strNewString) & "." & strFileNameExt '短文件名进行替换
+                            strFileNamePre = Left(vFileName(i), InStrRev(vFileName(i), ".") - 1) '后缀之前的内容
+                            strFileNameExt = v(UBound(v)) '后缀
+                            
+                            If Left(strString, 1) = "/" Then '表示正则模式
+                                strFileNameNew = regForReplace.Replace(strFileNamePre, strNewString) & "." & strFileNameExt '用正则替换
+                            Else
+                                strFileNameNew = Replace(strFileNamePre, strString, strNewString) & "." & strFileNameExt
+                            End If
                         Else
-                            strFileNameNew = regForReplace.Replace(vFileName(i), strNewString) '短文件名进行替换
+                            If Left(strString, 1) = "/" Then '表示正则模式
+                                strFileNameNew = regForReplace.Replace(vFileName(i), strNewString) '用正则替换
+                            Else
+                                strFileNameNew = Replace(vFileName(i), strString, strNewString) '正常替换
+                            End If
                         End If
+                        
                         strFileNameNewFull = strDirectory & strFileNameNew '即将替换成的文件的全路径
                         
                         If strFileNameFull <> strFileNameNewFull Then
@@ -227,7 +233,25 @@ Private Sub DoCommand()
                     
                     If isDone Then
                         strFileNameFull = strDirectory & vFileName(i) '当前文件的全路径
-                        strFileNameNew = regForReplace.Replace(vFileName(i), "") '短文件名进行替换
+                        
+                        If isIgnoreExt And InStr(vFileName(i), ".") > 0 Then   '忽略后缀名。也就是不处理后缀名，当然如果没有后缀名的话直接走下面的分支替换
+                            v = Split(vFileName(i), ".")
+                            strFileNamePre = Left(vFileName(i), InStrRev(vFileName(i), ".") - 1) '后缀之前的内容
+                            strFileNameExt = v(UBound(v)) '后缀
+                            
+                            If Left(strString, 1) = "/" Then '表示正则模式
+                                strFileNameNew = regForReplace.Replace(strFileNamePre, "") & "." & strFileNameExt '用正则替换
+                            Else
+                                strFileNameNew = Replace(strFileNamePre, strString, "") & "." & strFileNameExt
+                            End If
+                        Else
+                            If Left(strString, 1) = "/" Then '表示正则模式
+                                strFileNameNew = regForReplace.Replace(vFileName(i), "") '用正则替换
+                            Else
+                                strFileNameNew = Replace(vFileName(i), strString, "") '正常替换
+                            End If
+                        End If
+                        
                         strFileNameNewFull = strDirectory & strFileNameNew '即将替换成的文件的全路径
                         
                         If strFileNameFull <> strFileNameNewFull Then
