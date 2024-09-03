@@ -51,7 +51,8 @@ Sub Main()
                 "(2) delete -dir directory -string string1 [-type (file|dir|all)[:string3]] [-ignorecase {yes|no}] [-log {yes|no}]" & vbCrLf & _
                 "(3) listfile -dir directory -string string1 [-type (file|dir|all)[:string3]] [-ignorecase {yes|no}] [-output path]" & vbCrLf & _
                 "(4) delfile -dir directory -string string1 [-type (file|dir|all)[:string3]] [-ignorecase {yes|no}] [-log {yes|no}]" & vbCrLf & _
-                "(5) utf8rename -dir directory [-type (file|dir|all)[:string3]] [-ignorecase {yes|no}] [-log {yes|no}]", vbExclamation
+                "(5) utf8decode -dir directory [-type (file|dir|all)[:string3]] [-ignorecase {yes|no}] [-log {yes|no}]" & vbCrLf & _
+                "(6) cn2number -dir directory [-type (file|dir|all)[:string3]] [-ignorecase {yes|no}] [-log {yes|no}]", vbExclamation
         Exit Sub
     End If
     
@@ -127,8 +128,8 @@ Private Sub SetParameter()
 End Sub
 '开始处理
 Private Sub DoCommand()
-    If Not isNameMatch(strCmdSub, "^(replace|rep|del|delete|listfile|delfile|deletefile|deldir|deletedir|utf8decode)$") Then
-        MsgBox "二级命令错误，找不到""" & strCmdSub & """，只能为(replace,delete,listfile,delfile,deldir,utf8decode)中的一种。" & vbCrLf & vbCrLf & "请仔细检查传入的参数:" & vbCrLf & strCmd, vbExclamation
+    If Not isNameMatch(strCmdSub, "^(replace|rep|del|delete|listfile|delfile|deletefile|deldir|deletedir|utf8decode|cn2number)$") Then
+        MsgBox "二级命令错误，找不到""" & strCmdSub & """，只能为(replace,delete,listfile,delfile,deldir,utf8decode,cn2number)中的一种。" & vbCrLf & vbCrLf & "请仔细检查传入的参数:" & vbCrLf & strCmd, vbExclamation
         Exit Sub
     End If
     
@@ -141,7 +142,7 @@ Private Sub DoCommand()
         End
     End If
     
-    If strString = "" And LCase(strCmdSub) <> "utf8decode" And LCase(strCmdSub) <> "deldir" And LCase(strCmdSub) <> "deletedir" Then
+    If strString = "" And LCase(strCmdSub) <> "utf8decode" And LCase(strCmdSub) <> "cn2number" And LCase(strCmdSub) <> "deldir" And LCase(strCmdSub) <> "deletedir" Then
         MsgBox "缺少必选参数string。设置方法:-string 要替换的字符(可以为正则表达式)。" & vbCrLf & vbCrLf & "请仔细检查传入的参数:" & vbCrLf & strCmd, vbExclamation
         Exit Sub
     End If
@@ -295,7 +296,7 @@ Private Sub DoCommand()
                         End If
                     End If
                 Next
-            Case "deldir", "deletedir" '未处理好20200924 deleteFonder
+            Case "deldir", "deletedir" '未处理好20200924 deleteFolder
                  For i = 0 To UBound(vFileName)
                     If strTypePattern = "" Then '如果处理范围的参数是空那么处理所有文件
                         isDone = True
@@ -325,6 +326,37 @@ Private Sub DoCommand()
                         strFileNameFull = strDirectory & vFileName(i) '当前文件的全路径
                 
                         strFileNameNew = UTF8Decode(vFileName(i)) '短文件名进行UTF8编码转换
+                        strFileNameNewFull = strDirectory & strFileNameNew '即将替换成的文件的全路径
+                        
+                        If strFileNameFull <> strFileNameNewFull Then
+                            strRenameStatus = DoRename(strFileNameFull, strFileNameNewFull)
+                            If isPutLog Then writeToFile strDirectory & "XRename.log", strRenameStatus, False
+                            If InStr(strRenameStatus, "状态:失败") > 0 Then writeToFile strDirectory & "err.log", strRenameStatus, False
+                        End If
+                    End If
+                Next
+            Case "cn2number"
+                For i = 0 To UBound(vFileName)
+                    If strTypePattern = "" Then '如果处理范围的参数是空那么处理所有文件
+                        isDone = True
+                    Else '如果正则表达式存在那么去判断是否匹配来进行过滤
+                        isDone = isNameMatch(vFileName(i), strTypePattern)
+                    End If
+                    
+                    If isDone Then
+                        strFileNameFull = strDirectory & vFileName(i) '当前文件的全路径
+                        strFileNameNew = vFileName(i)
+                        
+                        '替换中文数字
+                        Dim vCnNumber, intCnNumberIndex As Integer, strNumberChanged As String
+                        vCnNumber = regGetStrSubs(strFileNameNew, "([零一二三四五六七八九十百千万亿]+)")
+                        If vCnNumber(0) <> "*NULL*" Then
+                            For intCnNumberIndex = 0 To UBound(vCnNumber)
+                                strNumberChanged = ChineseNumberToArabic(vCnNumber(intCnNumberIndex))
+                                strFileNameNew = Replace(strFileNameNew, vCnNumber(intCnNumberIndex), strNumberChanged) '每个数字片段替换
+                            Next
+                        End If
+
                         strFileNameNewFull = strDirectory & strFileNameNew '即将替换成的文件的全路径
                         
                         If strFileNameFull <> strFileNameNewFull Then
@@ -369,7 +401,7 @@ Private Function DoDelete(ByVal strFileName$) As String
     If i = 16 Then '删除文件
         Kill strFileName
     Else '删除文件夹
-        deleteFonder strFileName
+        deleteFolder strFileName
     End If
     DoDelete = Format(Now, "yyyy-mm-dd hh:nn:ss") & vbCrLf & strFileName & vbCrLf & "状态:删除成功。" & vbCrLf
     
@@ -386,7 +418,7 @@ Private Function DoDeleteDir(ByVal strPath$) As String
 
     On Error GoTo Err1
     If i = 16 Then '是文件夹才删除，跳过文件
-        deleteFonder strPath
+        deleteFolder strPath
         DoDeleteDir = Format(Now, "yyyy-mm-dd hh:nn:ss") & vbCrLf & strPath & vbCrLf & "状态:删除文件夹成功。" & vbCrLf
     End If
     
@@ -436,7 +468,6 @@ Private Function regGetStrSub2(strData$, strPattern$) As String
         regGetStrSub2 = matchs(0).SubMatches(1)
     End If
 End Function
-
 '得到正则字匹配的所用内容，存放到一个数组中
 Private Function regGetStrSubs(strData$, strPattern$)
     Dim s$, v, i%
@@ -538,9 +569,52 @@ Public Function c2to10(ByVal x As String) As String
       If Mid(x, Len(x) - i, 1) = "1" Then c2to10 = c2to10 + 2 ^ (i)
    Next
 End Function
-Private Sub deleteFonder(ByVal strPath$)
+Private Sub deleteFolder(ByVal strPath$)
     Dim FSO As Object
     Set FSO = CreateObject("Scripting.FileSystemObject")
-    FSO.DeleteFolder strPath
+    FSO.deleteFolder strPath
     Set FSO = Nothing
 End Sub
+'将中文数字转换为阿拉伯数字
+Function ChineseNumberToArabic(ByVal cnNumber As String) As Long
+    Dim cnDigits As String
+    Dim cnValues()
+    Dim i As Integer, unit As Long
+    Dim result As Long, current As Long, num As Long
+    
+    ' 中文数字字符
+    cnDigits = "零一二三四五六七八九十百千万亿"
+    
+    ' 对应的阿拉伯数字值
+    cnValues = Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 100, 1000, 10000, 100000000)
+    
+    result = 0
+    current = 0
+    num = 0
+    
+    For i = 1 To Len(cnNumber)
+        unit = InStr(cnDigits, Mid(cnNumber, i, 1))
+        
+        If unit > 0 Then
+            unit = cnValues(unit - 1)
+            
+            If unit = 10 Or unit = 100 Or unit = 1000 Or unit = 10000 Or unit = 100000000 Then
+                If current = 0 Then
+                    current = 1
+                End If
+                current = current * unit
+                result = result + current
+                current = 0
+            Else
+                current = current + unit
+            End If
+        End If
+    Next i
+    
+    If current > 0 Then
+        result = result + current
+    End If
+    
+    ChineseNumberToArabic = result
+End Function
+
